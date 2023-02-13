@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Real-time Audio Input with Device Selection</title>
+</head>
+<body>
+  <select id="input-device"></select>
+  <select id="output-device"></select>
+  <button id="start-button">Start</button>
+  <button id="stop-button" disabled>Stop</button>
+  <script>
+    const inputDeviceSelector = document.querySelector('#input-device');
+    const outputDeviceSelector = document.querySelector('#output-device');
+    const startButton = document.querySelector('#start-button');
+    const stopButton = document.querySelector('#stop-button');
+
+    let audioContext;
+    let mediaStreamSource;
+
+    function populateDeviceList() {
+      navigator.mediaDevices.enumerateDevices()
+        .then(function(devices) {
+          devices.forEach(function(device) {
+            if (device.kind === 'audioinput') {
+              const option = document.createElement('option');
+              option.value = device.deviceId;
+              option.text = device.label;
+              inputDeviceSelector.appendChild(option);
+            } else if (device.kind === 'audiooutput') {
+              const option = document.createElement('option');
+              option.value = device.deviceId;
+              option.text = device.label;
+              outputDeviceSelector.appendChild(option);
+            }
+          });
+        })
+        .catch(function(err) {
+          console.error(err);
+        });
+    }
+
+    startButton.addEventListener('click', function() {
+      startButton.disabled = true;
+      stopButton.disabled = false;
+      inputDeviceSelector.disabled = true;
+      outputDeviceSelector.disabled = true;
+
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+      navigator.mediaDevices.getUserMedia({
+        audio: {
+          deviceId: { exact: inputDeviceSelector.value }
+        }
+      })
+        .then(function(stream) {
+          mediaStreamSource = audioContext.createMediaStreamSource(stream);
+          mediaStreamSource.connect(audioContext.destination);
+        })
+        .catch(function(err) {
+          console.error(err);
+        });
+    });
+
+    stopButton.addEventListener('click', function() {
+      startButton.disabled = false;
+      stopButton.disabled = true;
+      inputDeviceSelector.disabled = false;
+      outputDeviceSelector.disabled = false;
+
+      mediaStreamSource.disconnect();
+      audioContext.close();
+    });
+
+    window.addEventListener('load', populateDeviceList);
+  </script>
+</body>
+</html>
+
+
+VUE
+
+<template>
+  <div>
+    <select v-model="selectedInputDevice" :disabled="isRecording">
+      <option v-for="device in inputDevices" :value="device.deviceId">{{device.label}}</option>
+    </select>
+    <select v-model="selectedOutputDevice" :disabled="isRecording">
+      <option v-for="device in outputDevices" :value="device.deviceId">{{device.label}}</option>
+    </select>
+    <button @click="startRecording" :disabled="isRecording">Start</button>
+    <button @click="stopRecording" :disabled="!isRecording">Stop</button>
+  </div>
+</template>
+
+<script>
+export default {
+  data() {
+    return {
+      selectedInputDevice: '',
+      selectedOutputDevice: '',
+      inputDevices: [],
+      outputDevices: [],
+      isRecording: false,
+      audioContext: null,
+      mediaStreamSource: null
+    };
+  },
+  mounted() {
+    this.populateDeviceList();
+  },
+  methods: {
+    populateDeviceList() {
+      navigator.mediaDevices.enumerateDevices().then(devices => {
+        devices.forEach(device => {
+          if (device.kind === 'audioinput') {
+            this.inputDevices.push(device);
+          } else if (device.kind === 'audiooutput') {
+            this.outputDevices.push(device);
+          }
+        });
+      }).catch(err => {
+        console.error(err);
+      });
+    },
+    startRecording() {
+      this.isRecording = true;
+      this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      navigator.mediaDevices.getUserMedia({
+        audio: {
+          deviceId: { exact: this.selectedInputDevice }
+        }
+      }).then(stream => {
+        this.mediaStreamSource = this.audioContext.createMediaStreamSource(stream);
+        this.mediaStreamSource.connect(this.audioContext.destination);
+      }).catch(err => {
+        console.error(err);
+      });
+    },
+    stopRecording() {
+      this.isRecording = false;
+      this.mediaStreamSource.disconnect();
+      this.audioContext.close();
+    }
+  }
+};
+</script>
